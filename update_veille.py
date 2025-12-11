@@ -1,12 +1,21 @@
-import urllib.request
+import requests
 from bs4 import BeautifulSoup
 import os
-import git
+import subprocess
 
 def scrape_legifrance():
-    url = "https://www.legifrance.gouv.fr/recherche?query=nom+de+la+molécule"
-    response = urllib.request.urlopen(url)
-    html = response.read()
+    # Utiliser requests pour gérer correctement l'encodage
+    url = "https://www.legifrance.gouv.fr/recherche"
+    params = {"query": "nom de la molécule"}  # Remplacez par vos mots-clés
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    response = requests.get(url, params=params, headers=headers)
+    response.encoding = 'utf-8'  # Forcer l'encodage UTF-8
+    html = response.text
+
     soup = BeautifulSoup(html, 'html.parser')
 
     pdf_links = []
@@ -71,13 +80,21 @@ def generate_html(data, filename="index.html"):
         f.write(html_content)
 
 def push_to_github():
-    repo = git.Repo('.')
-    repo.git.add('index.html')
-    repo.git.commit('-m', 'Mise à jour de la veille documentaire')
-    repo.git.push()
+    try:
+        subprocess.run(['git', 'add', 'index.html'], check=True)
+        subprocess.run(['git', 'commit', '-m', 'Mise à jour de la veille documentaire'], check=True)
+        subprocess.run(['git', 'push'], check=True)
+        print("Modifications poussées vers GitHub avec succès.")
+    except subprocess.CalledProcessError as e:
+        print(f"Erreur lors de la mise à jour Git: {e}")
 
 if __name__ == "__main__":
-    data = scrape_legifrance()
-    generate_html(data)
-    push_to_github()
-    print("Page web mise à jour et poussée vers GitHub.")
+    try:
+        data = scrape_legifrance()
+        if data:
+            generate_html(data)
+            push_to_github()
+        else:
+            print("Aucun document PDF trouvé.")
+    except Exception as e:
+        print(f"Erreur lors de l'exécution du script: {e}")
